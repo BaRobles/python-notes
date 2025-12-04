@@ -1,0 +1,101 @@
+Here's a summary of the concepts and tips from the lecture on **classes and objects**:
+
+---
+
+## **Key Concepts**
+
+### **What is an Object?**
+- An **object** is a "container" that contains:
+  - **Data/State** (called **attributes**)
+  - **Functionality/Behaviors** (called **methods**)
+- **Example**: A car has:
+  - State: brand, model, year
+  - Behavior: accelerate, brake, steer
+
+### **Accessing Objects**
+- Use **dot notation**:
+  ```python
+  my_car.brand = "Ferrari"
+  my_car.accelerate()
+  ```
+
+### **Classes**
+- A **class** is a **template/blueprint** for creating objects.
+- In Python, **everything is an object**, including classes.
+- **Terminology**:
+  - **Class**: the "template" (also an object of type `type`).
+  - **Instance**: object created from the class.
+- **Example**:
+  ```python
+  class Person:
+      pass
+
+  p = Person()  # instance of the Person class
+  ```
+
+### **Creating Classes**
+- Use the `class` keyword:
+  ```python
+  class MyClass:
+      pass
+  ```
+- Even when empty, the class already has attributes and methods provided by Python (e.g., `__name__`).
+
+### **Checking Types**
+- `type(obj)`: returns the class of the object.
+- `isinstance(obj, Class)`: checks if the object is an instance of a class.
+- **Difference**:
+  ```python
+  type(p) is Person       # True (compares identity)
+  isinstance(p, Person)   # True (also considers inheritance)
+  ```
+
+---
+
+## **Tips and Precautions**
+
+### 1. **Differentiate Class vs Instance**
+- The **class** is the template (type `type`).
+- The **instance** is the object created from the class.
+- **Example**:
+  ```python
+  class Car:
+      pass
+
+  c = Car()
+  type(Car)   # <class 'type'>
+  type(c)     # <class '__main__.Car'>
+  ```
+
+### 2. **Pre-defined Attributes**
+- Empty classes already have attributes like `__name__` (class name).
+- Do not overwrite `__dunder__` attributes without understanding their purpose.
+
+### 3. **Proper Use of `type()` and `isinstance()`**
+- Prefer `isinstance()` for type checking, as it considers inheritance.
+- `type()` is more restrictive (does not consider subclasses).
+
+### 4. **Classes Are Callables**
+- Classes are **callable** (like functions), creating instances:
+  ```python
+  obj = MyClass()  # Calling the class creates an instance
+  ```
+
+### 5. **Meta Classes (Mentioned Only)**
+- Classes are created by **meta classes** (the "type of classes").
+- The type of a class is `type`.
+- **Caution**: Meta programming is advanced; avoid if not necessary.
+
+### 6. **Objects vs Classes in Language**
+- In other languages (Java), "object" = instance, "class" = template.
+- In Python, **everything is an object**, but maintain the conceptual distinction.
+
+---
+
+## **Practical Summary**
+- **Objects** = data + behaviors.
+- **Classes** = templates for creating objects.
+- **Instances** = objects created from classes.
+- Use **`.`** to access attributes/methods.
+- Use `isinstance()` for type checking.
+- Remember: classes are also objects (of type `type`).
