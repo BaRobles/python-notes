@@ -1,9 +1,3 @@
-Here's a summary of the concepts and tips from the lecture on **classes and objects**:
-
----
-
-## **Key Concepts**
-
 ### **What is an Object?**
 - An **object** is a "container" that contains:
   - **Data/State** (called **attributes**)
