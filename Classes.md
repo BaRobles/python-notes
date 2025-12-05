@@ -530,4 +530,3549 @@ class MyClass:
 
 ---
 
-## 11-12 CLASSES ARE CALLABLES
+## 13-14 DATA ATTRIBUTES
+
+### **1. Two Types of Attributes**
+- **Class Attributes**: Defined in the class namespace (`Class.__dict__`)
+- **Instance Attributes**: Defined in the instance namespace (`instance.__dict__`)
+
+### **2. Attribute Lookup Chain**
+When you access `instance.attribute`:
+1. Python **first** looks in `instance.__dict__`
+2. If not found, looks in `Class.__dict__` (class attributes)
+3. If still not found, continues up inheritance chain
+4. Raises `AttributeError` if never found
+
+### **3. Creating Attributes**
+```python
+class BankAccount:
+    apr = 1.2  # Class attribute (shared by all instances)
+
+# Instance attributes (specific to each object)
+account1 = BankAccount()
+account1.apr = 0  # Creates instance attribute
+account1.bank = "Acme"  # New instance attribute
+
+account2 = BankAccount()
+account2.apr  # 1.2 (from class, not instance)
+```
+
+### **4. Attribute Hiding/Overriding**
+- Instance attributes **hide** class attributes with the same name
+- Each instance maintains its own namespace
+- Changing a class attribute affects all instances **unless** they have their own instance attribute
+
+---
+
+## **Critical Tips and Precautions**
+
+### **1. Understand the Lookup Order**
+```python
+class Program:
+    language = "Python"  # Class attribute
+
+p = Program()
+print(p.language)  # "Python" (from class)
+
+p.language = "Java"  # Creates instance attribute
+print(p.language)    # "Java" (from instance, hides class)
+print(Program.language)  # "Python" (class unchanged)
+```
+
+### **2. Be Careful with Mutable Class Attributes**
+```python
+# ❌ DANGEROUS - Shared mutable object
+class Database:
+    connections = []  # Shared by ALL instances
+
+db1 = Database()
+db2 = Database()
+db1.connections.append("conn1")
+print(db2.connections)  # ["conn1"] (UNEXPECTED!)
+```
+
+### **3. Instance vs Class `__dict__` Behavior**
+```python
+# Class __dict__ = MappingProxy (read-only)
+Program.__dict__["version"] = 3.7  # ❌ TypeError
+
+# Instance __dict__ = regular dict (mutable)
+p = Program()
+p.__dict__["version"] = 3.7  # ✅ Works (but don't do this)
+p.version  # 3.7 (now accessible)
+```
+
+**Rule**: Use dot notation/setattr() instead of direct `__dict__` manipulation.
+
+### **4. Dynamic Attribute Addition**
+```python
+# ✅ Can add new attributes to instances dynamically
+account = BankAccount()
+account.custom_field = "value"  # Works for user-defined classes
+
+# ❌ Cannot add to built-in types
+s = "hello"
+s.custom = "value"  # AttributeError
+```
+
+### **5. Class Changes Affect All Instances**
+```python
+class Settings:
+    debug = False
+
+obj1 = Settings()
+obj2 = Settings()
+
+Settings.debug = True  # Changes for ALL instances
+print(obj1.debug)  # True
+print(obj2.debug)  # True
+
+obj1.debug = False  # Only affects obj1 (creates instance attr)
+print(obj2.debug)  # Still True
+```
+
+### **6. Empty `__dict__` Doesn't Mean No Attributes**
+```python
+class Test:
+    value = 10
+
+t = Test()
+print(t.__dict__)    # {} (empty)
+print(t.value)       # 10 (from class)
+print(hasattr(t, 'value'))  # True
+```
+
+### **7. Instance Attributes Hide Class Attributes Permanently**
+```python
+class Config:
+    timeout = 30
+
+c = Config()
+c.timeout = 60  # Instance attribute
+
+Config.timeout = 90  # Change class attribute
+print(c.timeout)     # Still 60 (instance hides class)
+del c.timeout        # Remove instance attribute
+print(c.timeout)     # Now 90 (from class again)
+```
+
+---
+
+## **Best Practices**
+
+### **1. Use Instance Attributes for Instance-Specific Data**
+```python
+class User:
+    def __init__(self, name):
+        self.name = name  # Instance attribute (correct)
+    
+    # Not: name = ""  # ❌ Class attribute (shared by all)
+```
+
+### **2. Use Class Attributes for Shared, Immutable Data**
+```python
+class MathConstants:
+    PI = 3.14159      # ✅ Good: constant, shared
+    VERSION = "1.0"   # ✅ Good: metadata
+```
+
+### **3. Avoid Mutable Class Attributes**
+```python
+# ❌ BAD - Shared mutable state
+class Cache:
+    data = {}  # All instances share the same dict!
+
+# ✅ BETTER - Instance-specific
+class Cache:
+    def __init__(self):
+        self.data = {}  # Each instance gets its own
+```
+
+### **4. Be Explicit About Attribute Intentions**
+```python
+class Employee:
+    # Class attributes (shared, read-only-ish)
+    COMPANY = "Acme Inc"
+    MIN_SALARY = 30000
+    
+    def __init__(self, name, salary):
+        # Instance attributes (per-object)
+        self.name = name
+        self.salary = max(salary, self.MIN_SALARY)
+```
+
+### **5. Check Both Class and Instance**
+```python
+def get_attribute_safely(obj, attr_name):
+    """Check if attribute exists anywhere in lookup chain."""
+    return hasattr(obj, attr_name)  # Checks instance → class → inheritance
+```
+
+---
+
+## **Common Pitfalls**
+
+### **1. Accidentally Creating Instance Attributes**
+```python
+class Counter:
+    count = 0  # Class attribute
+    
+    def increment(self):
+        self.count += 1  # ❌ Creates instance attribute!
+        # Should be: Counter.count += 1 or cls.count += 1
+```
+
+### **2. Confusion After Deleting Instance Attributes**
+```python
+obj = MyClass()
+obj.value = "instance"
+del obj.value  # Removes instance attribute
+print(obj.value)  # Now shows class attribute (if exists)
+```
+
+### **3. Unintended Attribute Sharing**
+```python
+class Player:
+    inventory = []  # ❌ ALL players share the same list!
+    
+    def add_item(self, item):
+        self.inventory.append(item)  # Affects ALL players
+```
+
+---
+
+## **Decision Guide**
+
+| When to Use | Class Attribute | Instance Attribute |
+|------------|----------------|-------------------|
+| **Data Type** | Constants, defaults, metadata | Object state, unique values |
+| **Mutability** | Immutable/seldom changed | Frequently changed |
+| **Sharing** | Shared by all instances | Unique to each instance |
+| **Storage** | One copy in memory | One copy per instance |
+| **Example** | `PI = 3.14`, `VERSION = "1.0"` | `self.name`, `self.balance` |
+
+---
+
+## **Key Takeaways**
+1. **Class attributes** are shared, **instance attributes** are unique
+2. **Instance attributes hide** class attributes with same name
+3. **Lookup order**: instance → class → parent classes
+4. **Instance `__dict__` is mutable**, class `__dict__` is read-only (mapping proxy)
+5. **Be cautious with mutable class attributes** - they create shared state
+6. **Use `__init__` for instance initialization**, class body for shared defaults
+7. **Dynamic attribute addition** works for user classes, not built-ins
+
+**Golden Rule**: If data should be different for each object, use instance attributes. If data should be the same for all objects, use class attributes (but be careful with mutability).
+
+---
+
+## 15-16 FUNCTION ATTRIBUTES
+
+### **1. Functions vs Methods**
+- **Functions defined in a class** become **methods** when accessed via instances
+- At class level: `Class.method` → **function**
+- At instance level: `instance.method` → **bound method**
+
+### **2. Method Binding**
+When you access a function attribute through an instance:
+```python
+class Person:
+    def say_hello():  # Function at class level
+        print("Hello")
+
+p = Person()
+p.say_hello  # Bound method (not a function anymore!)
+```
+- Python **automatically binds** the method to the instance
+- The bound method **injects the instance** as the first argument (`self`)
+
+### **3. How Binding Works**
+```python
+# Equivalent calls
+p.say_hello("John")          # Bound method call
+Person.say_hello(p, "John")  # Direct function call
+```
+The bound method essentially does: `method.__func__(method.__self__, args...)`
+
+### **4. Method Object Attributes**
+Bound methods have special attributes:
+- `.__self__`: The instance it's bound to
+- `.__func__`: The original function in the class
+
+---
+
+## **Critical Tips and Precautions**
+
+### **1. ALWAYS Include `self` Parameter in Instance Methods**
+```python
+# ❌ WRONG - Won't work from instances
+def say_hello():  # No self parameter
+    print("Hello")
+
+# ✅ CORRECT - Works from instances
+def say_hello(self):  # Has self parameter
+    print("Hello")
+```
+
+### **2. Use `self` Convention (Don't Use Other Names)**
+```python
+# ❌ AVOID - Non-standard
+def say_hello(this_instance):
+    print(f"Hello from {this_instance}")
+
+# ✅ DO THIS - Standard convention
+def say_hello(self):
+    print(f"Hello from {self}")
+```
+**Reason**: Everyone expects `self`; using other names confuses other developers.
+
+### **3. Monkey Patching: Add Methods to Class, Not Instance**
+```python
+class Person:
+    pass
+
+p = Person()
+
+# ✅ CORRECT - Add to class (creates bound methods)
+Person.do_work = lambda self: f"Do work from {self}"
+
+# ❌ WRONG - Add to instance (creates plain functions)
+p.other_func = lambda: "Just a function"
+
+print(p.do_work)    # <bound method> ✅
+print(p.other_func) # <function> ❌ (not bound)
+```
+
+### **4. Understanding the Type Difference**
+```python
+class MyClass:
+    def method(self):
+        pass
+
+obj = MyClass()
+
+type(MyClass.method)   # <class 'function'>
+type(obj.method)       # <class 'method'> (bound method)
+MyClass.method is obj.method.__func__  # True
+```
+
+### **5. Calling Methods from Class vs Instance**
+```python
+class Calculator:
+    def add(self, a, b):
+        return a + b
+
+calc = Calculator()
+
+# All equivalent:
+calc.add(2, 3)                 # ✅ Bound method call
+Calculator.add(calc, 2, 3)     # ✅ Direct function call
+calc.add.__func__(calc, 2, 3)  # ✅ Through __func__
+```
+
+### **6. Methods Defined at Runtime Still Bind Correctly**
+```python
+class Person:
+    pass
+
+# Add method after class definition
+Person.greet = lambda self: f"Hello from {self}"
+
+p = Person()
+p.greet()  # Works! Creates bound method
+```
+
+---
+
+## **Best Practices**
+
+### **1. Define All Methods in Class Body (Not Runtime)**
+```python
+# ✅ PREFERRED - Define in class
+class Person:
+    def __init__(self, name):
+        self.name = name
+    
+    def greet(self):
+        return f"Hello, I'm {self.name}"
+
+# ❌ AVOID - Runtime patching (harder to maintain)
+class Person:
+    pass
+
+Person.greet = lambda self: "Hello"  # Only if absolutely necessary
+```
+
+### **2. Access Instance State via `self`**
+```python
+class BankAccount:
+    def __init__(self, balance):
+        self.balance = balance  # Instance attribute
+    
+    def deposit(self, amount):
+        # ✅ Access via self
+        self.balance += amount
+        
+        # ❌ DON'T try to access directly
+        # balance += amount  # NameError!
+```
+
+### **3. Methods Can Access Both Instance and Class Attributes**
+```python
+class Config:
+    DEFAULT_TIMEOUT = 30  # Class attribute
+    
+    def __init__(self):
+        self.timeout = self.DEFAULT_TIMEOUT  # Instance attribute
+    
+    def show_timeout(self):
+        # Can access both:
+        print(f"Instance: {self.timeout}")
+        print(f"Class default: {self.DEFAULT_TIMEOUT}")
+```
+
+### **4. Use Properties for Complex Attribute Access**
+```python
+class Person:
+    def __init__(self, first, last):
+        self.first = first
+        self.last = last
+    
+    @property
+    def full_name(self):  # Acts like attribute, not method
+        return f"{self.first} {self.last}"
+    
+p = Person("John", "Doe")
+print(p.full_name)  # No parentheses! Looks like attribute
+```
+
+---
+
+## **Common Pitfalls**
+
+### **1. Forgetting `self` Parameter**
+```python
+class Logger:
+    def log_message(message):  # ❌ Missing self
+        print(message)
+
+logger = Logger()
+logger.log_message("Test")  # TypeError: takes 1 pos arg but 2 given
+# Python tries: log_message(logger, "Test") but only accepts 1 arg
+```
+
+### **2. Confusing Bound vs Unbound**
+```python
+class MyClass:
+    def method(self):
+        return "called"
+
+obj = MyClass()
+method_func = obj.method  # Bound method
+
+# Later, if obj is deleted:
+del obj
+method_func()  # ❌ Still bound to deleted object! May work or crash
+```
+
+### **3. Adding Functions to Instances (Not Classes)**
+```python
+class Data:
+    pass
+
+d1 = Data()
+d1.process = lambda self: "process"  # ❌ Added to instance
+
+d2 = Data()
+d2.process()  # ❌ AttributeError - not in d2
+```
+
+### **4. Method Signature Changes**
+```python
+class API:
+    def fetch(self, url):
+        # Version 1.0
+        pass
+
+# Later, you change signature:
+def fetch(self, url, timeout=10):
+    # Version 2.0 - breaks existing calls
+    pass
+
+API.fetch = fetch  # ❌ Existing code expecting 1 arg will break
+```
+
+---
+
+## **Quick Reference**
+
+| Situation | What to Do | Why |
+|-----------|------------|-----|
+| Defining instance method | Always include `self` as first parameter | Required for binding |
+| Calling method from class | Pass instance explicitly: `Class.method(instance, ...)` | No automatic binding |
+| Adding methods dynamically | Add to class, not instance | Ensures proper binding |
+| Accessing instance data | Use `self.attribute` | Direct access to instance namespace |
+| Following conventions | Always use `self`, not other names | Standard practice, readable code |
+| Checking method type | `isinstance(obj.method, types.MethodType)` | Verify it's a bound method |
+
+---
+
+## **Key Takeaways**
+1. **Functions in classes** → **bound methods** when accessed via instances
+2. **`self` is automatically injected** as first argument to instance methods
+3. **Always include `self` parameter** in instance methods
+4. **Use `self` convention** - don't rename it
+5. **Add methods to class** (not instances) for proper binding
+6. **Bound methods have `__self__` and `__func__`** attributes
+7. **Methods can access both instance and class attributes** via `self`
+8. **Runtime method addition (monkey patching)** works but use sparingly
+
+**Remember**: The magic of object-oriented programming in Python comes from this automatic binding. When you call `obj.method()`, Python seamlessly passes `obj` as the first argument, giving the method access to the instance's state. This is fundamental to how Python's OOP works.
+
+---
+
+## 17-18 INITIALIZING CLASS INSTANCES
+
+
+### **1. Two-Phase Object Creation**
+When you create an instance: `obj = Class()`
+1. **Creation Phase**: Python creates the object with empty namespace
+2. **Initialization Phase**: Python calls `__init__()` to set up the object
+
+### **2. `__init__` is NOT a Constructor**
+- Common misconception: `__init__` is **NOT** the constructor
+- The real constructor is `__new__()` (rarely overridden)
+- `__init__()` is the **initializer** - called AFTER object creation
+
+### **3. How `__init__` Works**
+```python
+class Person:
+    def __init__(self, name):  # Initializer method
+        self.name = name  # Set instance attribute
+
+p = Person("John")  # Creates object THEN calls __init__(p, "John")
+```
+
+---
+
+## **Critical Tips and Precautions**
+
+### **1. ALWAYS Include `self` as First Parameter**
+```python
+# ❌ WRONG - Missing self
+def __init__(name):
+    self.name = name  # Error: 'self' not defined
+
+# ✅ CORRECT
+def __init__(self, name):
+    self.name = name
+```
+
+### **2. Use `self` Convention (Not Other Names)**
+```python
+# ❌ AVOID - Non-standard
+def __init__(obj, name):
+    obj.name = name
+
+# ✅ DO THIS - Standard convention
+def __init__(self, name):
+    self.name = name
+```
+
+### **3. `__init__` is Called AFTER Object Exists**
+```python
+class Database:
+    def __new__(cls):  # Constructor (rarely used)
+        obj = super().__new__(cls)
+        print("Object created")
+        return obj
+    
+    def __init__(self):  # Initializer (common)
+        print("Object initialized")
+        # Object already exists here!
+        self.connection = "open"
+
+db = Database()
+# Output: "Object created" then "Object initialized"
+```
+
+### **4. Return `None` from `__init__`**
+```python
+# ❌ WRONG - __init__ should return None
+def __init__(self):
+    return "something"  # TypeError
+
+# ✅ CORRECT - __init__ returns None implicitly
+def __init__(self):
+    self.data = []
+    # No return statement needed
+```
+
+### **5. Don't Create New Objects in `__init__`**
+```python
+# ❌ CONFUSING - Creates and returns new object
+def __init__(self, value):
+    new_obj = type(self)(value * 2)
+    # Which object gets initialized? Confusing!
+
+# ✅ CLEAR - Initialize current instance only
+def __init__(self, value):
+    self.value = value * 2
+```
+
+### **6. Initialize All Important Instance Attributes**
+```python
+# ❌ BAD - Some attributes might be undefined
+class Account:
+    def __init__(self, balance):
+        self.balance = balance
+        # transaction_history not initialized
+
+# ✅ BETTER - Initialize all attributes
+class Account:
+    def __init__(self, balance):
+        self.balance = balance
+        self.transaction_history = []  # Always initialized
+```
+
+### **7. Use Default Values Carefully**
+```python
+# ❌ DANGEROUS - Mutable default argument
+class Cache:
+    def __init__(self, data=[]):  # Shared list!
+        self.data = data
+
+# ✅ SAFE - None as default, create inside
+class Cache:
+    def __init__(self, data=None):
+        self.data = data if data is not None else []
+```
+
+---
+
+## **Best Practices**
+
+### **1. Keep `__init__` Simple**
+```python
+class User:
+    def __init__(self, username, email):
+        # Just initialize attributes
+        self.username = username
+        self.email = email
+        self.created_at = datetime.now()
+        
+        # ❌ Avoid complex logic here
+        # self.validate_email()  # Move to separate method
+```
+
+### **2. Call Parent `__init__` When Inheriting**
+```python
+class Animal:
+    def __init__(self, species):
+        self.species = species
+
+class Dog(Animal):
+    def __init__(self, name, breed):
+        super().__init__("Canine")  # Initialize parent
+        self.name = name
+        self.breed = breed
+```
+
+### **3. Use Keyword Arguments for Clarity**
+```python
+class Rectangle:
+    def __init__(self, width, height, color="black"):
+        self.width = width
+        self.height = height
+        self.color = color
+
+# Clearer than positional arguments
+rect = Rectangle(width=10, height=20, color="blue")
+```
+
+### **4. Validate Input in `__init__`**
+```python
+class Temperature:
+    def __init__(self, celsius):
+        if not isinstance(celsius, (int, float)):
+            raise TypeError("Temperature must be numeric")
+        if celsius < -273.15:
+            raise ValueError("Temperature below absolute zero")
+        self.celsius = celsius
+```
+
+---
+
+## **Common Pitfalls**
+
+### **1. Forgetting to Call Parent `__init__`**
+```python
+class Base:
+    def __init__(self):
+        self.initialized = True
+
+class Derived(Base):
+    def __init__(self, value):
+        # ❌ Forgot super().__init__()
+        self.value = value
+        # self.initialized doesn't exist!
+
+# ✅ Correct
+class Derived(Base):
+    def __init__(self, value):
+        super().__init__()  # Initialize parent
+        self.value = value
+```
+
+### **2. Accessing Uninitialized Attributes**
+```python
+class Order:
+    def __init__(self, items):
+        self.items = items
+        self.total = self.calculate_total()  # ✅ Safe
+    
+    def calculate_total(self):
+        return sum(item.price for item in self.items)  # Uses initialized attribute
+```
+
+### **3. Overcomplicating `__init__`**
+```python
+# ❌ Too complex
+def __init__(self, config_file):
+    self.config = self.load_config(config_file)
+    self.db = self.connect_database(self.config['db'])
+    self.cache = self.initialize_cache(self.config['cache'])
+    # etc...
+
+# ✅ Better - Use factory method or builder pattern
+@classmethod
+def from_config(cls, config_file):
+    config = cls.load_config(config_file)
+    instance = cls()
+    instance.setup_from_config(config)
+    return instance
+```
+
+### **4. Mutating Class Attributes in `__init__`**
+```python
+class Counter:
+    count = 0  # Class attribute
+    
+    def __init__(self):
+        self.count += 1  # ❌ Creates instance attribute!
+        # Should be: Counter.count += 1 if you want to modify class attr
+```
+
+---
+
+## **Quick Reference**
+
+| What | How | Example |
+|------|-----|---------|
+| **Define initializer** | `def __init__(self, ...):` | `def __init__(self, name):` |
+| **Initialize attribute** | `self.attr = value` | `self.name = name` |
+| **Call parent initializer** | `super().__init__(...)` | `super().__init__(name)` |
+| **Default values** | `def __init__(self, x=None):` | `self.x = x if x else []` |
+| **Validation** | Check inputs at start | `if not name: raise ValueError` |
+
+---
+
+## **Key Takeaways**
+
+1. **Two phases**: Object creation (`__new__`) → Initialization (`__init__`)
+2. **`__init__` is NOT a constructor** - object already exists when it's called
+3. **Always use `self`** as first parameter (convention and clarity)
+4. **Initialize ALL important attributes** in `__init__`
+5. **Keep `__init__` simple** - just setup, not complex logic
+6. **Call `super().__init__()`** when inheriting from parent classes
+7. **Return `None`** from `__init__` (implicitly or explicitly)
+8. **Use validation** for critical parameters
+9. **Avoid mutable default arguments** - use `None` instead
+
+**Remember**: `__init__` is about setting up a **ready-to-use object**, not about creating it. Keep initialization focused, simple, and complete so objects are always in a valid state after creation.
+
+---
+
+## 19-20 CREATING ATTRIBUTES AT RUN-TIME
+
+### **1. Dynamic Attribute Addition**
+- You can add attributes to instances at runtime using:
+  - **Dot notation**: `obj.attribute = value`
+  - **`setattr()`**: `setattr(obj, 'attribute', value)`
+- This works for both **data attributes** and **function attributes**
+
+### **2. Functions vs Methods at Runtime**
+```python
+# Adding a function to instance
+obj.say_hello = lambda: "Hello"
+type(obj.say_hello)  # <class 'function'> (NOT bound method)
+
+# Function from class (via def)
+obj.say_hello  # <bound method> (when accessed via instance)
+```
+- **Functions added at runtime** remain plain functions
+- **Functions defined in class** become bound methods when accessed via instances
+
+### **3. Creating Bound Methods Manually**
+Use `types.MethodType` to create bound methods at runtime:
+```python
+from types import MethodType
+
+def func(self):
+    return f"Hello from {self.name}"
+
+# Create bound method and assign to instance
+obj.say_hello = MethodType(func, obj)
+type(obj.say_hello)  # <class 'method'> (bound method)
+```
+
+### **4. Plugin Pattern**
+Register different implementations for different instances:
+```python
+class Worker:
+    def register_task(self, func):
+        self._task = MethodType(func, self)  # Bind to this instance
+    
+    def do_task(self):
+        return self._task()
+
+worker1 = Worker()
+worker2 = Worker()
+
+worker1.register_task(lambda self: "Task A")
+worker2.register_task(lambda self: "Task B")
+```
+
+---
+
+## **Critical Tips and Precautions**
+
+### **1. Understand Function vs Method Binding**
+```python
+# ❌ Adding function directly - NOT bound
+obj.task = lambda self: "do work"  # 'self' won't be passed!
+obj.task()  # TypeError: missing 1 required argument
+
+# ✅ Creating bound method
+from types import MethodType
+obj.task = MethodType(lambda self: "do work", obj)
+obj.task()  # Works! self is passed automatically
+```
+
+### **2. Bound Methods are Instance-Specific**
+```python
+obj1 = MyClass()
+obj2 = MyClass()
+
+# Method bound to obj1 only affects obj1
+obj1.custom_method = MethodType(func, obj1)
+obj2.custom_method  # AttributeError (not in obj2)
+```
+
+### **3. Use `types.MethodType` Correctly**
+```python
+from types import MethodType
+
+# ❌ WRONG - Forgetting to pass instance
+obj.method = MethodType(func)  # TypeError: needs instance
+
+# ❌ WRONG - Binding to wrong object
+obj1.method = MethodType(func, obj2)  # Bound to obj2!
+
+# ✅ CORRECT
+obj.method = MethodType(func, obj)  # Bound to same object
+```
+
+### **4. Check for Existence Before Calling**
+```python
+# ❌ DANGEROUS - May raise AttributeError
+def do_work(self):
+    return self._custom_task()  # _custom_task might not exist
+
+# ✅ SAFER - Check first
+def do_work(self):
+    if hasattr(self, '_custom_task'):
+        return self._custom_task()
+    raise AttributeError("Must register task first")
+```
+
+### **5. Private Convention with Underscore**
+```python
+class PluginSystem:
+    def register(self, func):
+        self._impl = MethodType(func, self)  # _ indicates "private"
+    
+    def execute(self):
+        return self._impl()  # Access "private" attribute
+```
+**Note**: Underscore is just convention - Python doesn't enforce privacy!
+
+### **6. Memory Considerations**
+```python
+# Each bound method is a separate object
+obj1.method = MethodType(func, obj1)  # New method object
+obj2.method = MethodType(func, obj2)  # Another new method object
+
+# Memory overhead: each instance gets its own method object
+# Better for few instances, worse for many
+```
+
+---
+
+## **Best Practices**
+
+### **1. Use Class Methods for Shared Behavior**
+```python
+# ❌ INEFFICIENT - Same function, many method objects
+for obj in objects:
+    obj.method = MethodType(same_func, obj)  # Creates N method objects
+
+# ✅ EFFICIENT - Single method at class level
+class MyClass:
+    @classmethod
+    def shared_method(cls):
+        return "shared"
+```
+
+### **2. Factory Pattern for Dynamic Methods**
+```python
+class Worker:
+    def __init__(self, task_type):
+        self._setup_task(task_type)
+    
+    def _setup_task(self, task_type):
+        if task_type == 'A':
+            self.task = MethodType(self._task_a, self)
+        else:
+            self.task = MethodType(self._task_b, self)
+    
+    def _task_a(self):
+        return "Task A"
+    
+    def _task_b(self):
+        return "Task B"
+```
+
+### **3. Use Properties for Dynamic Access**
+```python
+class Configurable:
+    def __init__(self):
+        self._impl = None
+    
+    def register(self, func):
+        self._impl = MethodType(func, self)
+    
+    @property
+    def action(self):
+        if self._impl is None:
+            raise AttributeError("No implementation registered")
+        return self._impl()
+```
+
+### **4. Document Dynamic Attributes**
+```python
+class DynamicObject:
+    """
+    This class supports runtime method addition.
+    
+    Usage:
+        obj = DynamicObject()
+        obj.add_method('process', lambda self: ...)
+    """
+    
+    def add_method(self, name, func):
+        """Add a bound method to this instance."""
+        setattr(self, name, MethodType(func, self))
+```
+
+---
+
+## **Common Pitfalls**
+
+### **1. Forgetting to Import `types`**
+```python
+# ❌ ModuleNotFoundError
+from types import MethodType  # Missing import
+
+# ✅ Always import
+from types import MethodType, FunctionType
+```
+
+### **2. Binding to Deleted Objects**
+```python
+obj = MyClass()
+method = MethodType(func, obj)
+del obj  # Delete the instance
+method()  # ❌ Still bound to deleted object! May crash
+```
+
+### **3. Serialization Issues**
+```python
+import pickle
+
+obj = MyClass()
+obj.method = MethodType(func, obj)
+
+# ❌ Pickle can't serialize bound methods created at runtime
+pickle.dumps(obj)  # PicklingError
+```
+
+### **4. Debugging Difficulty**
+```python
+# Methods added at runtime don't appear in class definition
+# Hard to trace where they came from
+
+# ✅ Better: Store registration info
+obj._method_source = "registered at runtime from module X"
+```
+
+### **5. Inheritance Problems**
+```python
+class Base:
+    pass
+
+class Derived(Base):
+    pass
+
+obj = Derived()
+obj.method = MethodType(func, obj)
+
+# Method only exists on this instance, not on sibling instances
+sibling = Derived()
+sibling.method  # ❌ AttributeError
+```
+
+---
+
+## **When to Use Dynamic Methods**
+
+| Use Case | Recommended | Alternative |
+|----------|------------|-------------|
+| **Plugin system** | ✅ Good fit | Strategy pattern |
+| **Few instances** | ✅ OK | Class inheritance |
+| **Many instances** | ❌ Avoid (memory) | Class methods |
+| **Temporary methods** | ✅ Good | Context managers |
+| **Core functionality** | ❌ Avoid | Define in class |
+
+### **Example: Plugin Registration System**
+```python
+from types import MethodType
+
+class Processor:
+    def __init__(self):
+        self._plugins = {}
+    
+    def register_plugin(self, name, func):
+        """Register a plugin function as a bound method."""
+        bound_method = MethodType(func, self)
+        self._plugins[name] = bound_method
+        setattr(self, name, bound_method)
+    
+    def list_plugins(self):
+        return list(self._plugins.keys())
+
+# Usage
+processor = Processor()
+processor.register_plugin('compress', lambda self, data: data[:10])
+processor.register_plugin('encrypt', lambda self, data: data[::-1])
+
+processor.compress("long data string")  # Uses bound method
+```
+
+---
+
+## **Key Takeaways**
+
+1. **Dynamic attributes** can be added anytime using `setattr()` or dot notation
+2. **Functions added at runtime** don't automatically become bound methods
+3. **Use `types.MethodType(func, instance)`** to create bound methods manually
+4. **Bound methods are instance-specific** - each gets its own method object
+5. **Check for existence** before calling dynamically added methods
+6. **Consider memory overhead** - each bound method is a separate object
+7. **Use for plugin systems**, not for core functionality
+8. **Document dynamic methods** - they're invisible in class definition
+9. **Serialization issues** - pickle can't handle runtime-bound methods
+10. **Simplicity trade-off** - sometimes inheritance is cleaner
+
+**Remember**: Dynamic method creation is powerful but should be used judiciously. It's great for plugin systems, runtime configuration, and special cases, but for most situations, defining methods in the class body is simpler and more maintainable.
+
+---
+
+## 21-22 PROPERTIES
+
+### **1. Bare Attributes vs Properties**
+- **Bare Attributes**: Direct access to instance data
+  ```python
+  class Person:
+      def __init__(self, name):
+          self.name = name  # Bare attribute
+  
+  p = Person("Alex")
+  p.name = "Eric"  # Direct access
+  ```
+- **Properties**: Controlled access through getter/setter methods
+  ```python
+  class Person:
+      def __init__(self, name):
+          self._name = name  # "Private" backing attribute
+      
+      def get_name(self):    # Getter method
+          return self._name
+      
+      def set_name(self, value):  # Setter method
+          self._name = value
+  ```
+
+### **2. The `property` Class**
+- Creates managed attributes with getter/setter/deleter methods
+- Maintains same interface as bare attributes
+```python
+class Person:
+    def __init__(self, name):
+        self._name = name
+    
+    def get_name(self):
+        return self._name
+    
+    def set_name(self, value):
+        self._name = value
+    
+    # Property definition
+    name = property(fget=get_name, fset=set_name, doc="Person's name")
+```
+
+### **3. Python's Approach vs Java**
+- **Java**: Always start with private attributes + getters/setters
+- **Python**: Start with bare attributes → convert to properties when needed
+- **Key advantage**: Backward compatibility when converting
+
+### **4. "Private" Attributes Convention**
+- Use `_leading_underscore` to indicate "private" (not enforced)
+- Convention only - Python doesn't prevent access
+- Signals to other developers: "Don't touch this directly"
+
+---
+
+## **Critical Tips and Precautions**
+
+### **1. Start with Bare Attributes (Pythonic Approach)**
+```python
+# ✅ PYTHONIC - Start simple
+class Person:
+    def __init__(self, name):
+        self.name = name  # Bare attribute is fine initially
+
+# Later, if validation needed, convert to property WITHOUT breaking code
+class Person:
+    def __init__(self, name):
+        self._name = name  # Now using backing attribute
+    
+    @property
+    def name(self):
+        return self._name
+    
+    @name.setter
+    def name(self, value):
+        # Add validation here
+        self._name = value
+```
+
+### **2. Use Property Decorators (Cleaner Syntax)**
+```python
+class Person:
+    def __init__(self, name):
+        self._name = name
+    
+    @property  # Getter
+    def name(self):
+        return self._name
+    
+    @name.setter  # Setter
+    def name(self, value):
+        # Validation logic here
+        self._name = value
+    
+    @name.deleter  # Deleter
+    def name(self):
+        del self._name
+```
+
+### **3. Validate in Setter, Use Setter in `__init__`**
+```python
+# ❌ BAD - Bypasses validation in __init__
+def __init__(self, name):
+    self._name = name  # Direct assignment skips validation
+
+def set_name(self, value):
+    if not value.strip():
+        raise ValueError("Name cannot be empty")
+    self._name = value
+
+# ✅ GOOD - Uses setter in __init__
+def __init__(self, name):
+    self.set_name(name)  # Reuse validation logic
+
+@property
+def name(self):
+    return self._name
+
+@name.setter
+def name(self, value):
+    if not isinstance(value, str):
+        raise TypeError("Name must be a string")
+    if not value.strip():
+        raise ValueError("Name cannot be empty")
+    self._name = value.strip()
+```
+
+### **4. Properties are Class Attributes (Not Instance)**
+```python
+class Person:
+    name = property(...)  # Class attribute
+    
+p = Person()
+print('name' in p.__dict__)  # False - Not in instance
+print('name' in Person.__dict__)  # True - In class
+print('_name' in p.__dict__)  # True - Backing attribute in instance
+```
+
+### **5. Instance Attributes Don't Override Properties**
+```python
+p = Person("Alex")
+p.__dict__['name'] = "Manual"  # Add instance attribute
+
+# Property STILL wins over instance attribute!
+print(p.name)  # "Alex" (from property, NOT "Manual")
+```
+
+### **6. Proper Deleter Implementation**
+```python
+# ❌ CONFUSING - What should deleter do?
+@name.deleter
+def name(self):
+    pass  # Delete what?
+
+# ✅ CLEAR - Document deleter behavior
+@name.deleter
+def name(self):
+    """Remove the backing attribute."""
+    del self._name
+    # Note: Property still exists at class level!
+```
+
+### **7. Document Properties with Docstrings**
+```python
+class Temperature:
+    @property
+    def celsius(self):
+        """Temperature in degrees Celsius."""
+        return self._celsius
+    
+    @celsius.setter
+    def celsius(self, value):
+        """Set temperature in degrees Celsius.
+        
+        Args:
+            value: Must be >= -273.15 (absolute zero)
+        """
+        if value < -273.15:
+            raise ValueError("Below absolute zero")
+        self._celsius = value
+```
+
+### **8. Computed Properties (No Setter)**
+```python
+class Circle:
+    def __init__(self, radius):
+        self.radius = radius
+    
+    @property
+    def area(self):
+        """Computed property - no backing attribute."""
+        return 3.14159 * self.radius ** 2
+    
+    # No setter needed - area is computed from radius
+```
+
+---
+
+## **Best Practices**
+
+### **1. When to Use Properties**
+- **Data validation needed**
+- **Computed/derived values**
+- **Lazy evaluation** (compute on first access)
+- **Side effects on access** (logging, caching)
+- **Maintaining invariants** between attributes
+
+### **2. Use Backing Attributes Consistently**
+```python
+class BankAccount:
+    def __init__(self, balance):
+        self._balance = balance  # Consistent naming
+    
+    @property
+    def balance(self):
+        return self._balance
+    
+    @balance.setter
+    def balance(self, value):
+        if value < 0:
+            raise ValueError("Balance cannot be negative")
+        self._balance = value
+```
+
+### **3. Read-Only Properties**
+```python
+class DatabaseConnection:
+    def __init__(self):
+        self._connection_id = id(self)
+    
+    @property
+    def connection_id(self):
+        """Read-only property."""
+        return self._connection_id
+    
+    # No setter = read-only!
+```
+
+### **4. Property Caching**
+```python
+class ExpensiveComputation:
+    def __init__(self):
+        self._result = None
+    
+    @property
+    def result(self):
+        """Compute once, cache result."""
+        if self._result is None:
+            print("Computing...")
+            self._result = self._heavy_computation()
+        return self._result
+```
+
+### **5. Property Inheritance**
+```python
+class Base:
+    def __init__(self):
+        self._value = 0
+    
+    @property
+    def value(self):
+        return self._value
+    
+    @value.setter
+    def value(self, val):
+        self._value = val
+
+class Derived(Base):
+    @Base.value.setter  # Extend parent property
+    def value(self, val):
+        if val < 0:
+            raise ValueError("Must be non-negative")
+        super(Derived, Derived).value.fset(self, val)
+```
+
+---
+
+## **Common Pitfalls**
+
+### **1. Bypassing Validation**
+```python
+p = Person("Alex")
+p._name = ""  # ❌ Bypasses setter validation
+p._name = 123  # ❌ Bypasses type checking
+```
+
+### **2. Infinite Recursion**
+```python
+class BadExample:
+    @property
+    def value(self):
+        return self.value  # ❌ Infinite recursion!
+    
+    @value.setter
+    def value(self, val):
+        self.value = val  # ❌ Infinite recursion!
+```
+
+### **3. Forgetting Backing Attribute**
+```python
+class Circle:
+    @property
+    def area(self):
+        return 3.14 * self.radius ** 2
+    
+    @area.setter
+    def area(self, val):
+        # ❌ No backing attribute to store to!
+        self._area = val  # Creates new attribute, breaks consistency
+```
+
+### **4. Property vs Method Confusion**
+```python
+# ❌ CONFUSING - Looks like attribute but has side effects
+class Logger:
+    @property
+    def log(self):
+        write_to_file(self._data)  # Side effect!
+        return self._data
+
+# ✅ BETTER - Use method for actions
+class Logger:
+    def log_data(self):
+        write_to_file(self._data)
+        return self._data
+```
+
+### **5. Serialization Issues**
+```python
+import pickle
+
+class Person:
+    def __init__(self, name):
+        self._name = name
+    
+    @property
+    def name(self):
+        return self._name
+
+p = Person("Alex")
+pickle.dumps(p)  # ❌ Pickles _name but property logic is lost
+```
+
+---
+
+## **Advanced Considerations**
+
+### **1. Properties vs Descriptors**
+- Properties are a specific type of descriptor
+- Descriptors provide more control (covered later)
+
+### **2. Performance Overhead**
+- Property access has slight overhead vs bare attributes
+- Usually negligible, but consider for performance-critical code
+
+### **3. Dynamic Properties**
+```python
+def make_property(name):
+    def getter(self):
+        return getattr(self, f"_{name}")
+    
+    def setter(self, value):
+        setattr(self, f"_{name}", value)
+    
+    return property(getter, setter)
+
+class DynamicClass:
+    attr1 = make_property("attr1")
+    attr2 = make_property("attr2")
+```
+
+### **4. Property Documentation**
+```python
+class Documented:
+    @property
+    def important_value(self):
+        """This is the docstring that appears in help().
+        
+        Can be multiple lines with details about the property,
+        validation rules, examples, etc.
+        """
+        return self._value
+```
+
+---
+
+## **Decision Table: When to Use What**
+
+| Situation | Use | Why |
+|-----------|-----|-----|
+| **Simple data storage** | Bare attribute | Simplest, fastest |
+| **Validation needed** | Property with setter | Control setting behavior |
+| **Read-only value** | Property (no setter) | Prevent modification |
+| **Computed value** | Property (no setter) | Derived from other data |
+| **Side effects on access** | Property | Logging, caching, etc. |
+| **Backward compatibility** | Property | Convert later without breaking API |
+| **Many similar attributes** | Descriptors (advanced) | Reuse logic |
+
+---
+
+## **Key Takeaways**
+
+1. **Python philosophy**: Start simple with bare attributes
+2. **Convert to properties** when you need control, without breaking existing code
+3. **Use `_leading_underscore`** for "private" backing attributes (convention only)
+4. **Properties are class attributes** that intercept instance attribute access
+5. **Instance attributes don't override properties** - property wins
+6. **Always validate in setters** and call setters from `__init__`
+7. **Document properties** with docstrings for clear API
+8. **Consider read-only properties** for computed values
+9. **Avoid side effects** in getters (use methods instead)
+10. **Use decorator syntax** (`@property`) for cleaner code
+
+**Golden Rule**: In Python, expose attributes directly until you have a specific reason not to. When you need control, use properties while maintaining the same interface. This keeps your code simple and maintainable while allowing future enhancements.
+
+---
+
+## 23-24 PROPERTY DECORATORS
+
+### **1. Property Class Methods**
+The `property` class has three special methods:
+- **`.getter(f)`**: Sets the getter function
+- **`.setter(f)`**: Sets the setter function  
+- **`.deleter(f)`**: Sets the deleter function
+Each returns a **new property object** with the specified function added.
+
+### **2. Property Creation Patterns**
+```python
+# Method 1: Using property() constructor
+class MyClass:
+    def get_x(self): return self._x
+    def set_x(self, value): self._x = value
+    x = property(fget=get_x, fset=set_x)
+
+# Method 2: Using decorators (most common)
+class MyClass:
+    @property
+    def x(self):
+        return self._x
+    
+    @x.setter
+    def x(self, value):
+        self._x = value
+```
+
+### **3. How Decorator Syntax Works**
+```python
+# This:
+@property
+def name(self):
+    return self._name
+
+# Is equivalent to:
+def name(self):
+    return self._name
+name = property(name)  # Create property, reassign symbol
+```
+
+### **4. Incremental Property Building**
+```python
+# Step 1: Create property with getter
+prop = property(get_func)
+
+# Step 2: Add setter (returns NEW property object)
+prop = prop.setter(set_func)
+
+# Step 3: Add deleter (returns another NEW property object)
+prop = prop.deleter(del_func)
+```
+Each step creates a **new property object** with the added functionality.
+
+---
+
+## **Critical Tips and Precautions**
+
+### **1. MUST Use Same Property Name for Setter/Deleter Decorators**
+```python
+class Person:
+    @property
+    def name(self):
+        return self._name
+    
+    # ❌ WRONG - Different name
+    @name.setter
+    def set_name(self, value):  # Creates property "set_name"!
+        self._name = value
+    
+    # ✅ CORRECT - Same name
+    @name.setter
+    def name(self, value):  # Modifies existing "name" property
+        self._name = value
+```
+
+### **2. Property Objects are Immutable**
+```python
+prop = property(get_func)
+prop2 = prop.setter(set_func)  # Returns NEW object
+print(prop is prop2)  # False - Different objects!
+print(prop.fget is prop2.fget)  # True - Same getter function
+```
+
+### **3. Order Matters in Property Creation**
+```python
+# ❌ WRONG - Can't call .setter before property exists
+@x.setter  # Error: x doesn't exist yet
+def x(self, value):
+    pass
+
+# ✅ CORRECT - Define property first
+@property
+def x(self):
+    return self._x
+
+@x.setter  # Now x exists
+def x(self, value):
+    self._x = value
+```
+
+### **4. Docstrings Must be on Getter**
+```python
+class Person:
+    @property
+    def name(self):
+        """Person's full name."""  # ✅ Docstring HERE
+        return self._name
+    
+    @name.setter
+    def name(self, value):
+        """This docstring is IGNORED!"""  # ❌ Not used
+        self._name = value
+
+help(Person.name)  # Shows getter's docstring only
+```
+
+### **5. Write-Only Properties**
+```python
+class Secret:
+    # Create empty property first
+    _data = property()
+    
+    @_data.setter
+    def data(self, value):
+        self._secret = value
+    
+    # No getter = write-only
+
+s = Secret()
+s.data = "hidden"  # ✅ Works
+print(s.data)      # ❌ AttributeError (no getter)
+```
+
+### **6. Don't Modify Property Objects After Creation**
+```python
+prop = property(lambda self: "get")
+prop.fget = lambda self: "new"  # ❌ May not work as expected
+
+# ✅ Create new property instead
+prop = property(lambda self: "new")
+```
+
+---
+
+## **Best Practices**
+
+### **1. Use Decorator Syntax (Cleanest)**
+```python
+class Circle:
+    def __init__(self, radius):
+        self._radius = radius
+    
+    @property
+    def radius(self):
+        """The circle's radius."""
+        return self._radius
+    
+    @radius.setter
+    def radius(self, value):
+        if value < 0:
+            raise ValueError("Radius cannot be negative")
+        self._radius = value
+    
+    @property
+    def area(self):
+        """Computed area (read-only)."""
+        return 3.14159 * self._radius ** 2
+```
+
+### **2. Keep Property Names Consistent**
+```python
+class BankAccount:
+    def __init__(self):
+        self._balance = 0
+    
+    @property
+    def balance(self):
+        return self._balance
+    
+    @balance.setter
+    def balance(self, amount):  # Same name "balance"
+        self._balance = amount
+    
+    @balance.deleter
+    def balance(self):  # Same name "balance"
+        del self._balance
+```
+
+### **3. Document Properties Thoroughly**
+```python
+class Temperature:
+    @property
+    def celsius(self):
+        """Temperature in degrees Celsius.
+        
+        Setting this property automatically updates
+        the Fahrenheit equivalent. Values below
+        absolute zero (-273.15°C) raise ValueError.
+        """
+        return self._celsius
+    
+    @celsius.setter
+    def celsius(self, value):
+        if value < -273.15:
+            raise ValueError("Below absolute zero")
+        self._celsius = value
+```
+
+### **4. Use Properties for Validation**
+```python
+class Email:
+    def __init__(self, address):
+        self.address = address  # Uses property setter
+    
+    @property
+    def address(self):
+        return self._address
+    
+    @address.setter
+    def address(self, value):
+        if '@' not in value:
+            raise ValueError("Invalid email address")
+        self._address = value
+```
+
+### **5. Property Inheritance Works Naturally**
+```python
+class Animal:
+    @property
+    def sound(self):
+        return "generic sound"
+
+class Dog(Animal):
+    @property
+    def sound(self):
+        return "bark"  # Overrides parent property
+```
+
+---
+
+## **Common Pitfalls**
+
+### **1. Infinite Recursion**
+```python
+class BadExample:
+    @property
+    def value(self):
+        return self.value  # ❌ Infinite recursion!
+    
+    @value.setter
+    def value(self, val):
+        self.value = val  # ❌ Infinite recursion!
+
+# ✅ Use backing attribute
+class GoodExample:
+    @property
+    def value(self):
+        return self._value  # Different name!
+    
+    @value.setter
+    def value(self, val):
+        self._value = val
+```
+
+### **2. Wrong Decorator Order**
+```python
+# ❌ Setter before property
+@x.setter
+def x(self, value):
+    pass
+
+@property  # Too late!
+def x(self):
+    return self._x
+
+# ✅ Property first, then setter
+@property
+def x(self):
+    return self._x
+
+@x.setter  # x exists now
+def x(self, value):
+    self._x = value
+```
+
+### **3. Confusing Property with Method**
+```python
+class Config:
+    @property
+    def load(self):
+        return read_file()  # ❌ Looks like attribute but does I/O
+    
+    # ✅ Better as method
+    def load_config(self):
+        return read_file()  # Clear it's an action
+```
+
+### **4. Forgetting to Call Parent Setters**
+```python
+class Base:
+    @property
+    def value(self):
+        return self._value
+    
+    @value.setter
+    def value(self, val):
+        self._value = val
+
+class Derived(Base):
+    @property
+    def value(self):
+        return super().value
+    
+    @value.setter
+    def value(self, val):
+        # ❌ Forgets to call parent setter
+        self._value = val * 2  # Only sets child attribute
+```
+
+### **5. Testing Property Access**
+```python
+prop = property(lambda self: "test")
+
+# ❌ Can't call directly (needs instance)
+prop()  # TypeError
+
+# ✅ Create dummy class
+class Dummy:
+    x = prop
+
+d = Dummy()
+print(d.x)  # "test" - Works!
+```
+
+---
+
+## **Advanced Techniques**
+
+### **1. Dynamic Properties**
+```python
+def create_property(name):
+    """Factory for properties with custom validation."""
+    def getter(self):
+        return getattr(self, f"_{name}")
+    
+    def setter(self, value):
+        if not isinstance(value, str):
+            raise TypeError(f"{name} must be a string")
+        setattr(self, f"_{name}", value)
+    
+    return property(getter, setter)
+
+class DynamicClass:
+    title = create_property("title")
+    author = create_property("author")
+```
+
+### **2. Cached Properties**
+```python
+class ExpensiveComputation:
+    def __init__(self):
+        self._cache = None
+    
+    @property
+    def result(self):
+        if self._cache is None:
+            print("Computing...")
+            self._cache = self._heavy_computation()
+        return self._cache
+```
+
+### **3. Property with Side Effects**
+```python
+class Observable:
+    def __init__(self):
+        self._value = None
+        self._observers = []
+    
+    @property
+    def value(self):
+        return self._value
+    
+    @value.setter
+    def value(self, new_value):
+        old_value = self._value
+        self._value = new_value
+        for observer in self._observers:
+            observer(old_value, new_value)
+```
+
+### **4. Property Descriptors (Advanced)**
+```python
+class ValidatedProperty:
+    """Custom descriptor similar to property."""
+    def __init__(self, validator):
+        self.validator = validator
+        self._name = None
+    
+    def __set_name__(self, owner, name):
+        self._name = f"_{name}"
+    
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        return getattr(obj, self._name)
+    
+    def __set__(self, obj, value):
+        if self.validator(value):
+            setattr(obj, self._name, value)
+        else:
+            raise ValueError("Invalid value")
+```
+
+---
+
+## **Quick Reference Table**
+
+| Task | Syntax | Notes |
+|------|--------|-------|
+| **Create getter** | `@property` | Must be first |
+| **Add setter** | `@name.setter` | Name MUST match property |
+| **Add deleter** | `@name.deleter` | Name MUST match property |
+| **Docstring** | In getter method | Only getter's docstring is used |
+| **Write-only** | `prop = property(); @prop.setter` | Create empty property first |
+| **Read-only** | `@property` only (no setter) | Can't assign values |
+| **Validation** | In setter method | Call setter from `__init__` |
+
+---
+
+## **Key Takeaways**
+
+1. **Property decorators** are syntactic sugar for creating property objects
+2. **`.setter` and `.deleter`** return **new property objects** (properties are immutable)
+3. **Use same name** in setter/deleter decorators (`@name.setter def name():`)
+4. **Order matters**: `@property` → `@name.setter` → `@name.deleter`
+5. **Docstrings go on getters** only (setter/deleter docstrings are ignored)
+6. **Properties are class attributes** that intercept instance attribute access
+7. **Write-only properties** require creating an empty property first
+8. **Backward compatibility**: Properties maintain the same interface as bare attributes
+9. **Avoid side effects** in getters (use methods for actions)
+10. **Test properties** by instantiating the class, not calling property objects directly
+
+**Golden Rule**: Use the decorator syntax for properties—it's cleaner, more readable, and follows Python conventions. Always start with simple properties and add setters/deleters only when needed, maintaining the same property name throughout.
+
+---
+
+## 25-26 READ-ONLY AND COMPUTED PROPERTIES
+
+### **Read-Only Properties**
+- Created by defining only a getter (no setter/deleter)
+- Users can still modify backing `_variable` (underscore convention only)
+- Underscore indicates "private" - modifying it breaks class functionality
+
+### **Computed Properties**
+- Properties calculated dynamically, not stored directly
+- More natural syntax than method calls: `circle.area` vs `circle.area()`
+- Can implement lazy evaluation and caching
+
+### **Lazy Evaluation with Caching Pattern**
+```python
+class Circle:
+    def __init__(self, radius):
+        self._radius = radius
+        self._area = None  # Cache starts empty
+    
+    @property
+    def radius(self):
+        return self._radius
+    
+    @radius.setter
+    def radius(self, value):
+        self._radius = value
+        self._area = None  # Invalidate cache when radius changes
+    
+    @property
+    def area(self):
+        if self._area is None:  # Calculate only if needed
+            print("Calculating area...")
+            self._area = 3.14159 * self._radius ** 2
+        return self._area
+```
+
+### **Web Page Example - Advanced Caching**
+```python
+class WebPage:
+    def __init__(self, url):
+        self._url = url
+        self._page = None       # Cache for downloaded page
+        self._page_size = None  # Cache for size
+        self._load_time = None  # Cache for load time
+    
+    @property
+    def url(self):
+        return self._url
+    
+    @url.setter
+    def url(self, value):
+        self._url = value
+        self._page = None      # Invalidate all caches on URL change
+        self._page_size = None
+        self._load_time = None
+    
+    @property
+    def page(self):
+        if self._page is None:
+            self._download_page()  # Lazy download
+        return self._page
+    
+    @property
+    def page_size(self):
+        if self._page is None:
+            self._download_page()  # Trigger download if needed
+        return self._page_size
+    
+    def _download_page(self):
+        # Download logic with timing
+        start = perf_counter()
+        self._page = download(self._url)
+        self._load_time = perf_counter() - start
+        self._page_size = len(self._page)
+```
+
+---
+
+## **Critical Tips and Precautions**
+
+### **1. "Private" Backing Variables are NOT Secure**
+```python
+class Circle:
+    def __init__(self, radius):
+        self._radius = radius  # Underscore = convention only
+    
+c = Circle(5)
+c._radius = -10  # ❌ Users CAN modify "private" variables
+```
+- Underscore indicates "don't touch" but Python doesn't enforce
+- Modifying backing variables bypasses validation and breaks caching
+
+### **2. Always Invalidate Cache on Related Changes**
+```python
+# ❌ BAD - Forgets to invalidate cache
+@radius.setter
+def radius(self, value):
+    self._radius = value
+    # Forgot: self._area = None
+
+# ✅ GOOD - Invalidates dependent caches
+@radius.setter
+def radius(self, value):
+    self._radius = value
+    self._area = None  # Invalidate area cache
+    self._circumference = None  # Invalidate other caches
+```
+
+### **3. Use Properties for Natural Attributes**
+```python
+# ❌ Unnatural - Method for inherent property
+circle.area()  # Looks like action, not property
+
+# ✅ Natural - Property for inherent attribute
+circle.area    # Reads like attribute (but calculates)
+```
+
+### **4. Don't Over-Cache**
+```python
+# ❌ Caching everything wastes memory
+class OverCache:
+    def __init__(self):
+        self._simple_value = None  # Don't cache trivial calculations
+        self._another_cache = None
+    
+    @property
+    def simple_value(self):
+        if self._simple_value is None:
+            self._simple_value = 2 + 2  # Trivial - don't cache!
+        return self._simple_value
+```
+
+### **5. Thread Safety in Caching**
+```python
+# ❌ NOT thread-safe
+@property
+def data(self):
+    if self._data is None:  # Race condition here
+        self._data = expensive_calculation()
+    return self._data
+
+# ✅ Consider threading for shared resources
+import threading
+@property
+def data(self):
+    with self._lock:  # Add locking for thread safety
+        if self._data is None:
+            self._data = expensive_calculation()
+        return self._data
+```
+
+### **6. Property Getters Should Be Idempotent**
+```python
+# ❌ BAD - Side effects in getter
+@property
+def data(self):
+    self._counter += 1  # Changes state on read!
+    return self._data
+
+# ✅ GOOD - No side effects in getters
+@property
+def data(self):
+    return self._data  # Pure function
+```
+
+---
+
+## **Best Practices**
+
+### **1. Start Simple, Convert Later**
+```python
+# Phase 1: Simple bare attribute
+class Circle:
+    def __init__(self, radius):
+        self.radius = radius  # Bare attribute
+    
+# Phase 2: Add validation via property
+class Circle:
+    def __init__(self, radius):
+        self.radius = radius  # Now uses property setter
+    
+    @property
+    def radius(self):
+        return self._radius
+    
+    @radius.setter
+    def radius(self, value):
+        if value < 0:
+            raise ValueError("Radius cannot be negative")
+        self._radius = value
+        self._area = None  # Added caching later
+```
+
+### **2. Cache Expensive Operations Only**
+```python
+class ExpensiveComputation:
+    def __init__(self):
+        self._cache = None
+    
+    @property
+    def result(self):
+        if self._cache is None:
+            print("Performing expensive computation...")
+            self._cache = self._heavy_operation()
+        return self._cache
+    
+    def _heavy_operation(self):
+        # Simulate expensive work
+        import time
+        time.sleep(2)
+        return 42
+```
+
+### **3. Use Properties for Derived Values**
+```python
+class Rectangle:
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+    
+    @property
+    def area(self):
+        return self.width * self.height  # Computed, not stored
+    
+    @property 
+    def is_square(self):
+        return self.width == self.height  # Boolean property
+```
+
+### **4. Document Caching Behavior**
+```python
+class DatabaseResult:
+    @property
+    def data(self):
+        """Retrieve data from database.
+        
+        Note: Results are cached after first access.
+        Call refresh() to update cached data.
+        """
+        if self._data is None:
+            self._data = self._query_database()
+        return self._data
+    
+    def refresh(self):
+        """Force refresh of cached data."""
+        self._data = None
+```
+
+### **5. Consider Alternative: Cached Property Decorator**
+```python
+from functools import cached_property
+
+class Circle:
+    def __init__(self, radius):
+        self.radius = radius
+    
+    @cached_property
+    def area(self):
+        print("Calculating area...")
+        return 3.14159 * self.radius ** 2
+# Python 3.8+ built-in, automatically caches
+```
+
+---
+
+## **Common Pitfalls**
+
+### **1. Cache Invalidation Bugs**
+```python
+class Shape:
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+        self._area = None
+    
+    @property
+    def area(self):
+        if self._area is None:
+            self._area = self.width * self.height
+        return self._area
+    
+    # ❌ Forgot to invalidate cache when dimensions change
+    def resize(self, width, height):
+        self.width = width
+        self.height = height
+        # Should add: self._area = None
+```
+
+### **2. Recursive Property Calls**
+```python
+class BadCache:
+    @property
+    def data(self):
+        if self._data is None:
+            self._data = self.data  # ❌ Infinite recursion!
+        return self._data
+```
+
+### **3. Memory Leaks with Large Caches**
+```python
+class ImageProcessor:
+    def __init__(self):
+        self._processed = {}
+    
+    @property
+    def image(self):
+        if self._source not in self._processed:
+            # Caches EVERY source image forever!
+            self._processed[self._source] = process(self._source)
+        return self._processed[self._source]
+# Use weak references or size limits for large caches
+```
+
+### **4. Inconsistent State from Direct Backing Variable Access**
+```python
+c = Circle(5)
+c.area  # Calculates and caches area for radius 5
+c._radius = 10  # Direct modification
+c.area  # ❌ Returns cached area for radius 5 (WRONG!)
+```
+
+---
+
+## **When to Use Computed Properties**
+
+| Use Case | Use Property | Use Method |
+|----------|-------------|------------|
+| **Simple derivation** | ✅ `circle.area` | ❌ `circle.area()` |
+| **Expensive calculation** | ✅ With caching | ✅ Without caching |
+| **Natural attribute** | ✅ `person.age` | ❌ `person.get_age()` |
+| **Action/Command** | ❌ `object.save()` | ✅ `object.save()` |
+| **Side effects** | ❌ Getter with side effects | ✅ Method with side effects |
+| **Multiple arguments** | ❌ Can't pass args | ✅ Method with parameters |
+
+### **Decision Table: Cache vs Recalculate**
+
+| Factor | Cache | Recalculate |
+|--------|-------|-------------|
+| **Calculation cost** | High | Low |
+| **Call frequency** | High | Low |
+| **Memory available** | Plenty | Limited |
+| **Data volatility** | Low | High |
+| **Thread safety** | Needs locking | Simpler |
+
+---
+
+## **Key Takeaways**
+
+1. **Read-only properties**: Define getter only, no setter
+2. **Computed properties**: Calculate values dynamically, feel like attributes
+3. **Lazy evaluation**: Calculate only when needed, cache results
+4. **Cache invalidation**: Clear caches when dependent values change
+5. **Backing variables**: Use `_name` convention, but users can still modify them
+6. **Start simple**: Use bare attributes first, convert to properties when needed
+7. **Document caching**: Tell users when results are cached
+8. **No side effects**: Getters should be idempotent
+9. **Thread safety**: Consider locking for shared caches
+10. **Natural syntax**: Use properties for inherent attributes, methods for actions
+
+**Properties bridge the gap between simple attributes and method calls, providing controlled access with the clean syntax of attribute access.**
+
+---
+
+## 27-28 DELETING PROPERTIES
+
+### **Key Distinction**
+- **Deleting from instance**: Removes backing attribute from instance namespace
+- **Not deleting from class**: Property remains defined at class level
+- **Deleter method**: Code that runs when `del instance.property` is called
+
+### **How Deleter Works**
+```python
+class Circle:
+    def __init__(self, color):
+        self._color = color  # Backing attribute
+    
+    @property
+    def color(self):
+        return self._color
+    
+    @color.setter
+    def color(self, value):
+        self._color = value
+    
+    @color.deleter
+    def color(self):
+        print("Deleter called")
+        del self._color  # Removes backing attribute ONLY
+
+c = Circle("red")
+print(c.color)  # "red"
+del c.color     # Calls deleter, removes _color
+print(c.color)  # AttributeError: _color doesn't exist
+```
+
+### **Two Syntax Styles**
+
+**Style 1: Explicit Property Instantiation**
+```python
+class Person:
+    def __init__(self, name):
+        self._name = name
+    
+    def get_name(self):
+        return self._name
+    
+    def set_name(self, value):
+        self._name = value
+    
+    def del_name(self):
+        del self._name
+    
+    # Create property with all three methods
+    name = property(fget=get_name, fset=set_name, 
+                    fdel=del_name, doc="Person's name")
+```
+
+**Style 2: Decorator Syntax (Preferred)**
+```python
+class Person:
+    def __init__(self, name):
+        self._name = name
+    
+    @property
+    def name(self):
+        """Person's name."""
+        return self._name
+    
+    @name.setter
+    def name(self, value):
+        self._name = value
+    
+    @name.deleter
+    def name(self):
+        del self._name
+```
+
+---
+
+## **Critical Tips and Precautions**
+
+### **1. Deleter Removes Backing Attribute, Not Property**
+```python
+p = Person("Alex")
+del p.name  # Calls deleter, removes _name from instance
+
+# Property STILL exists at class level
+print(hasattr(Person, 'name'))  # True
+print(hasattr(p, '_name'))      # False
+
+# Can still reassign (property setter still works)
+p.name = "Bob"  # ✅ Creates new _name attribute
+```
+
+### **2. Deleter Must Handle Missing Backing Attribute**
+```python
+# ❌ BAD - Assumes _name exists
+@name.deleter
+def name(self):
+    del self._name  # AttributeError if _name already deleted
+
+# ✅ BETTER - Check first
+@name.deleter
+def name(self):
+    if hasattr(self, '_name'):
+        del self._name
+    # Or use try/except
+```
+
+### **3. Deleter is Optional**
+```python
+class ReadOnly:
+    @property
+    def value(self):
+        return 42
+    
+    # No setter = can't assign
+    # No deleter = can't delete
+    # del obj.value raises AttributeError
+```
+
+### **4. Use `del` or `delattr()`**
+```python
+p = Person("Alex")
+
+# Both work the same way
+del p.name              # ✅
+delattr(p, 'name')      # ✅
+
+# Both call the deleter method
+```
+
+### **5. Deleter Can Do More Than Just Delete**
+```python
+class DatabaseConnection:
+    @property
+    def connection(self):
+        if not hasattr(self, '_conn'):
+            self._conn = create_connection()
+        return self._conn
+    
+    @connection.deleter
+    def connection(self):
+        if hasattr(self, '_conn'):
+            self._conn.close()  # Cleanup before deletion
+            del self._conn
+```
+
+### **6. Instance Dictionary vs Class Property**
+```python
+p = Person("Alex")
+
+# Instance dictionary (changes with deleter)
+print(p.__dict__)        # {'_name': 'Alex'}
+del p.name
+print(p.__dict__)        # {} - Empty
+
+# Class still has property
+print('name' in Person.__dict__)  # True
+print(type(Person.name))          # <class 'property'>
+```
+
+### **7. Deleter Doesn't Prevent Reassignment**
+```python
+p = Person("Alex")
+del p.name          # Removes _name
+p.name = "Bob"      # ✅ Still works - calls setter
+print(p.name)       # "Bob" - getter works again
+```
+
+---
+
+## **Best Practices**
+
+### **1. Document Deleter Behavior**
+```python
+class Resource:
+    @property
+    def handle(self):
+        """File handle for the resource.
+        
+        Deleting this property closes the file handle
+        and removes it from the instance.
+        """
+        if not hasattr(self, '_handle'):
+            self._handle = open(self.filename)
+        return self._handle
+    
+    @handle.deleter
+    def handle(self):
+        """Close and remove the file handle."""
+        if hasattr(self, '_handle'):
+            self._handle.close()
+            del self._handle
+```
+
+### **2. Use for Cleanup, Not Just Deletion**
+```python
+class Cache:
+    def __init__(self):
+        self._data = {}
+    
+    @property
+    def data(self):
+        return self._data
+    
+    @data.deleter
+    def data(self):
+        # Clear cache and log
+        print(f"Clearing cache with {len(self._data)} items")
+        self._data.clear()
+        # Don't delete _data itself - keep empty dict
+```
+
+### **3. Consider Read-Only Properties (No Deleter)**
+```python
+class Constants:
+    @property
+    def PI(self):
+        return 3.14159
+    
+    # No setter or deleter = truly read-only
+    # del obj.PI raises AttributeError
+```
+
+### **4. Alternative: Custom `__delattr__` Method**
+```python
+class Person:
+    def __init__(self, name):
+        self._name = name
+    
+    def __delattr__(self, name):
+        if name == 'name':
+            print(f"Deleting name: {self._name}")
+            super().__delattr__('_name')
+        else:
+            super().__delattr__(name)
+    
+    @property
+    def name(self):
+        return self._name
+    
+    @name.setter
+    def name(self, value):
+        self._name = value
+```
+
+---
+
+## **Common Pitfalls**
+
+### **1. Assuming Deleter Removes Property from Class**
+```python
+# ❌ WRONG ASSUMPTION
+del instance.property  # This does NOT remove property from class
+
+# ✅ REALITY
+# Deleter just runs code, typically removes backing attribute
+# Property remains in class definition
+```
+
+### **2. Forgetting to Handle Missing Attributes**
+```python
+@color.deleter
+def color(self):
+    del self._color  # ❌ Crashes if called twice
+
+# Call sequence:
+del obj.color  # Works
+del obj.color  # ❌ AttributeError: _color doesn't exist
+```
+
+### **3. Breaking Property Consistency**
+```python
+class Circle:
+    def __init__(self, radius):
+        self.radius = radius
+    
+    @property
+    def area(self):
+        return 3.14 * self.radius ** 2
+    
+    @area.deleter
+    def area(self):
+        # ❌ What should this do? Area is computed!
+        # Deleting area doesn't make conceptual sense
+        pass
+```
+
+### **4. Confusing Instance vs Class Deletion**
+```python
+class MyClass:
+    prop = property(lambda self: "value")
+
+# Different operations:
+obj = MyClass()
+del obj.prop      # ❌ Calls deleter (if exists) or AttributeError
+del MyClass.prop  # ✅ Deletes property from class (not instance)
+```
+
+### **5. Not Testing Deleter with Missing State**
+```python
+# Test both cases:
+p = Person("Alex")
+del p.name      # Test normal deletion
+del p.name      # Test deletion when already deleted
+```
+
+---
+
+## **When to Use a Deleter**
+
+| Use Case | Use Deleter | Alternative |
+|----------|------------|-------------|
+| **Resource cleanup** | ✅ Close files/connections | Context manager |
+| **Cache invalidation** | ✅ Clear cached data | Separate method |
+| **Reset to default** | ✅ Remove custom value | Set to default |
+| **Computed property** | ❌ Doesn't make sense | No deleter |
+| **Required attribute** | ❌ Shouldn't be deletable | No deleter |
+| **Simple attributes** | ❌ Use `del obj.attr` | Direct deletion |
+
+### **Decision Table: Deleter vs Direct Deletion**
+
+| Factor | Use Property Deleter | Use `del obj.attr` |
+|--------|---------------------|-------------------|
+| **Cleanup needed** | Yes | No |
+| **Validation needed** | Yes | No |
+| **Backing attribute** | Private (`_attr`) | Public |
+| **Property exists** | Yes | No |
+| **Multiple actions** | Yes | Single action only |
+
+---
+
+## **Key Takeaways**
+
+1. **Deleter methods** run when `del instance.property` is called
+2. **Removes backing attribute** (`_name`) from instance, not property from class
+3. **Property remains** at class level after deletion from instance
+4. **Can reassign** after deletion - property setter still works
+5. **Use decorator syntax** `@name.deleter` for consistency
+6. **Handle missing attributes** in deleter (use `hasattr()` or try/except)
+7. **Not commonly needed** - most properties don't need deleters
+8. **Use for cleanup** (closing files, clearing caches) not just deletion
+9. **Document deleter behavior** - users need to know what happens
+10. **Test edge cases** - deletion when attribute already missing
+
+**Deleters provide controlled cleanup when properties are removed from instances, but the property definition remains in the class for future use.**
+
+---
+
+## 29 QUESTIONS ON THE PROPERTY CLASS
+
+### **Key Limitations of Properties**
+
+#### **1. Reusability Issues**
+- Same property logic must be redefined in multiple classes
+- No built-in inheritance mechanism for property behavior
+- Validation logic duplication across classes
+
+#### **2. Code Duplication Example**
+```python
+# ❌ Duplicate validation in multiple classes
+class User:
+    @property
+    def email(self):
+        return self._email
+    
+    @email.setter
+    def email(self, value):
+        if '@' not in value:
+            raise ValueError("Invalid email")
+        self._email = value
+
+class Customer:
+    @property
+    def email(self):  # Same logic repeated
+        return self._email
+    
+    @email.setter
+    def email(self, value):
+        if '@' not in value:  # Duplicate validation
+            raise ValueError("Invalid email")
+        self._email = value
+```
+
+#### **3. Multiple Properties with Same Logic**
+```python
+class Person:
+    @property
+    def first_name(self):
+        return self._first_name
+    
+    @first_name.setter
+    def first_name(self, value):
+        if not value.strip():  # Duplicate validation
+            raise ValueError("First name cannot be empty")
+        self._first_name = value
+    
+    @property
+    def last_name(self):
+        return self._last_name
+    
+    @last_name.setter  
+    def last_name(self, value):
+        if not value.strip():  # Same validation repeated
+            raise ValueError("Last name cannot be empty")
+        self._last_name = value
+```
+
+### **Alternative Solutions Mentioned**
+
+#### **1. External Function References (Workaround)**
+```python
+# Define validation once
+def validate_non_empty(value):
+    if not value.strip():
+        raise ValueError("Cannot be empty")
+    return value.strip()
+
+class Person:
+    @property
+    def first_name(self):
+        return self._first_name
+    
+    @first_name.setter
+    def first_name(self, value):
+        self._first_name = validate_non_empty(value)  # Reuse function
+    
+    @property
+    def last_name(self):
+        return self._last_name
+    
+    @last_name.setter
+    def last_name(self, value):
+        self._last_name = validate_non_empty(value)  # Reuse same function
+```
+
+#### **2. Coming Solution: Data Descriptors**
+- Property class is actually a **data descriptor** (to be covered)
+- Custom descriptors provide more control and reusability
+- Advanced topic requiring deeper understanding
+
+### **Class-Level Properties (Advanced)**
+- **Current**: Properties bound to instances (`instance.property`)
+- **Advanced**: Properties bound to classes (`Class.property`)
+- **Requires metaprogramming** - not covered in basics
+- Class properties control access to class attributes, not instance attributes
+
+---
+
+## **Critical Tips and Precautions**
+
+### **1. Recognize When Properties Become Cumbersome**
+```python
+# ❌ Property overuse - too many similar properties
+class Product:
+    @property
+    def name(self): ...
+    @property def sku(self): ...
+    @property def price(self): ... 
+    @property def cost(self): ...
+    @property def weight(self): ...
+    # All with similar validation patterns
+    
+# ✅ Consider alternatives for many similar properties
+# - Data descriptors
+# - Custom validation decorators
+# - External validation functions
+```
+
+### **2. Don't Duplicate Validation Logic**
+```python
+# ❌ BAD - Copy-paste validation
+class User:
+    @property
+    def email(self):
+        return self._email
+    
+    @email.setter
+    def email(self, value):
+        # Validation logic here...
+        pass
+
+class Customer:
+    @property
+    def email(self):
+        return self._email
+    
+    @email.setter
+    def email(self, value):
+        # SAME validation logic copied...
+        pass
+
+# ✅ BETTER - Extract common logic
+def validate_email(value):
+    # Common validation
+    return validated_value
+```
+
+### **3. Properties are Convenient but Limited**
+- **Good for**: Simple get/set with validation
+- **Limited for**: Reuse across multiple classes
+- **Limited for**: Complex property interactions
+- **Limited for**: Dynamic property creation
+
+### **4. Consider Complexity Before Using Properties**
+```python
+# Simple case - Properties are perfect
+class Circle:
+    @property
+    def radius(self):
+        return self._radius
+    
+    @radius.setter
+    def radius(self, value):
+        if value < 0:
+            raise ValueError("Radius cannot be negative")
+        self._radius = value
+
+# Complex case - Might need alternatives
+class ConfigManager:
+    # Many properties with inter-dependent validation
+    # Complex caching requirements
+    # Dynamic property creation needed
+```
+
+### **5. Property Inheritance Works But Limited**
+```python
+class Base:
+    @property
+    def value(self):
+        return self._value
+    
+    @value.setter
+    def value(self, val):
+        self._value = val
+
+class Derived(Base):
+    @Base.value.setter  # Can extend but syntax is awkward
+    def value(self, val):
+        if val < 0:
+            raise ValueError("Must be positive")
+        super(Derived, Derived).value.fset(self, val)
+```
+
+### **6. Watch for Property Proliferation**
+```python
+# ❌ Too many properties = hard to maintain
+class Employee:
+    @property def name(self): ...
+    @property def id(self): ...
+    @property def department(self): ...
+    @property def salary(self): ...
+    @property def hire_date(self): ...
+    @property def manager(self): ...
+    @property def email(self): ...
+    @property def phone(self): ...
+    # 20+ properties with similar patterns
+```
+
+### **7. Testing Property Logic**
+```python
+# Properties make testing validation logic repetitive
+def test_user_email_validation():
+    u = User()
+    with pytest.raises(ValueError):
+        u.email = "invalid"  # Tests User.email validation
+
+def test_customer_email_validation():
+    c = Customer()
+    with pytest.raises(ValueError):
+        c.email = "invalid"  # Tests SAME logic again
+# Same test duplicated for each class with same validation
+```
+
+---
+
+## **Best Practices for Property Management**
+
+### **1. Extract Common Validation**
+```python
+# Define once, use everywhere
+VALIDATORS = {
+    'email': lambda v: v if '@' in v else ValueError("Invalid email"),
+    'non_empty': lambda v: v if v.strip() else ValueError("Cannot be empty"),
+    'positive': lambda v: v if v > 0 else ValueError("Must be positive"),
+}
+
+class User:
+    @property
+    def email(self):
+        return self._email
+    
+    @email.setter
+    def email(self, value):
+        self._email = VALIDATORS['email'](value)
+```
+
+### **2. Consider Factory Functions for Common Properties**
+```python
+def create_string_property(name, validator=None):
+    """Factory for string properties with validation."""
+    storage_name = f"_{name}"
+    
+    def getter(self):
+        return getattr(self, storage_name)
+    
+    def setter(self, value):
+        if validator:
+            value = validator(value)
+        setattr(self, storage_name, value)
+    
+    return property(getter, setter)
+
+class Person:
+    first_name = create_string_property('first_name', 
+                                       lambda v: v.strip() or ValueError("Required"))
+    last_name = create_string_property('last_name',
+                                      lambda v: v.strip() or ValueError("Required"))
+```
+
+### **3. Document When to Use Properties vs Alternatives**
+```python
+"""
+Property Use Decision Guide:
+
+USE PROPERTIES WHEN:
+- Simple get/set with validation
+- Few similar properties in class
+- No need for reuse across classes
+- Computed properties with caching
+
+CONSIDER ALTERNATIVES WHEN:
+- Same validation needed in many classes
+- Many similar properties in one class
+- Dynamic property creation needed
+- Complex property interactions
+"""
+```
+
+### **4. Plan for Property Evolution**
+```python
+# Start with properties, refactor if needed
+class Version1:
+    @property
+    def data(self):
+        return self._data
+    
+    @data.setter
+    def data(self, value):
+        self._data = validate_data(value)
+
+# Later, if reusability needed:
+class DataProperty:
+    """Custom descriptor for data validation."""
+    def __get__(self, obj, objtype):
+        return obj._data
+    
+    def __set__(self, obj, value):
+        obj._data = validate_data(value)
+
+class Version2:
+    data = DataProperty()  # Reusable across classes
+```
+
+---
+
+## **Common Pitfalls with Properties**
+
+### **1. Property Spaghetti**
+```python
+# ❌ Properties with complex interdependencies
+class Config:
+    @property
+    def width(self):
+        return self._width
+    
+    @width.setter
+    def width(self, value):
+        self._width = value
+        self._aspect_ratio = None  # Affects other property
+        self._area = None          # Affects another property
+    
+    @property
+    def area(self):
+        if self._area is None:
+            self._area = self.width * self.height
+        return self._area
+    
+    @area.setter  # ❌ Complex interdependency
+    def area(self, value):
+        # Changing area affects width/height...
+        pass
+```
+
+### **2. Testing Overhead**
+```python
+# Each property needs separate tests
+def test_product_properties():
+    p = Product()
+    # Test name property
+    with pytest.raises(ValueError):
+        p.name = ""
+    
+    # Test price property  
+    with pytest.raises(ValueError):
+        p.price = -10
+    
+    # Test sku property
+    with pytest.raises(ValueError):
+        p.sku = "invalid"
+    # ... repeats for each property
+```
+
+### **3. Maintenance Burden**
+```python
+# Changing validation affects multiple places
+def new_email_validation(value):
+    # Updated validation rules
+    if not re.match(EMAIL_REGEX, value):
+        raise ValueError("Invalid email format")
+    return value.lower()  # New requirement
+
+# Must update EVERY class with email property
+class User:
+    @email.setter
+    def email(self, value):
+        self._email = new_email_validation(value)  # Update here
+
+class Customer:
+    @email.setter  
+    def email(self, value):
+        self._email = new_email_validation(value)  # And here
+
+class Employee:
+    @email.setter
+    def email(self, value):
+        self._email = new_email_validation(value)  # And here...
+```
+
+### **4. Performance Considerations**
+```python
+# Properties add overhead vs bare attributes
+import timeit
+
+class BareAttribute:
+    def __init__(self):
+        self.value = 42
+
+class WithProperty:
+    def __init__(self):
+        self._value = 42
+    
+    @property
+    def value(self):
+        return self._value
+    
+    @value.setter
+    def value(self, v):
+        self._value = v
+
+# Property access is slower (usually negligible but matters in loops)
+```
+
+---
+
+## **Future Directions Mentioned**
+
+### **1. Data Descriptors (Coming Later)**
+- More flexible than properties
+- Better reusability across classes
+- More control over attribute access
+- Property class is actually a descriptor
+
+### **2. Class Properties (Metaprogramming)**
+- Properties bound to class, not instances
+- Control class attribute access
+- Advanced topic requiring deeper knowledge
+
+### **3. Dynamic Property Patterns**
+```python
+# Hint of what's possible with descriptors
+class ValidatedAttribute:
+    def __init__(self, validator):
+        self.validator = validator
+    
+    def __set_name__(self, owner, name):
+        self.storage_name = f"_{name}"
+    
+    def __get__(self, obj, objtype):
+        return getattr(obj, self.storage_name)
+    
+    def __set__(self, obj, value):
+        setattr(obj, self.storage_name, self.validator(value))
+
+class User:
+    email = ValidatedAttribute(lambda v: v if '@' in v else ValueError("Invalid"))
+    # Reusable across classes
+```
+
+---
+
+## **Key Takeaways**
+
+1. **Properties are convenient but have reusability limits** - Same logic must be redefined in each class
+2. **Code duplication risk** - Similar properties require duplicate validation logic
+3. **Consider alternatives for many similar properties** - Factory functions or external validators
+4. **Data descriptors are the underlying mechanism** - Property class is a convenience wrapper
+5. **Class properties require metaprogramming** - Advanced topic beyond basic properties
+6. **Extract common validation logic** - Reduce duplication even with properties
+7. **Watch for property proliferation** - Too many properties make classes hard to maintain
+8. **Testing overhead increases** - Each property needs separate tests
+9. **Performance impact minimal but exists** - Properties add overhead vs bare attributes
+10. **Plan for evolution** - Start with properties, refactor to descriptors if reusability needed
+
+**Properties are excellent for simple cases but recognize when you need more advanced patterns for reusability and maintenance.**
+
+---
+
+## 30-31 CLASS AND STATIC METHODS
+
+## **Class Methods and Static Methods**
+
+### **Three Types of Methods in Classes**
+
+#### **1. Instance Methods (Default)**
+- Defined as regular functions in class
+- When called from instance: **bound to instance** (`self` injected)
+- When called from class: remains regular function
+```python
+class Person:
+    def hello(self):  # Instance method
+        return f"Hello from {self}"
+
+p = Person()
+Person.hello  # <function> (regular function)
+p.hello       # <bound method> (bound to instance p)
+```
+
+#### **2. Class Methods (`@classmethod`)**
+- Decorated with `@classmethod`
+- Always **bound to class**, never to instance
+- First argument is **class** (conventionally `cls`)
+```python
+class MyClass:
+    @classmethod
+    def class_hello(cls):
+        return f"Hello from {cls}"
+
+MyClass.class_hello()    # Bound to MyClass
+instance.class_hello()   # Also bound to MyClass (not instance)
+```
+
+#### **3. Static Methods (`@staticmethod`)**
+- Decorated with `@staticmethod`
+- **Never bound** to anything (remains regular function)
+- No automatic arguments injected
+```python
+class Circle:
+    @staticmethod
+    def help():
+        return "Help information"
+
+Circle.help()       # Regular function call
+instance.help()     # Also regular function call
+```
+
+### **Binding Behavior Summary**
+
+| Method Type | Decorator | From Class | From Instance | First Argument |
+|-------------|-----------|------------|---------------|----------------|
+| **Instance** | None | Function | Bound to instance | Instance (`self`) |
+| **Class** | `@classmethod` | Bound to class | Bound to class | Class (`cls`) |
+| **Static** | `@staticmethod` | Function | Function | None |
+
+---
+
+## **Critical Tips and Precautions**
+
+### **1. Understand the Binding Differences**
+```python
+class Example:
+    def instance_method(self):
+        pass  # Bound to instance
+    
+    @classmethod
+    def class_method(cls):
+        pass  # Always bound to class
+    
+    @staticmethod
+    def static_method():
+        pass  # Never bound
+
+e = Example()
+
+# Check binding types
+print(type(Example.instance_method))   # <class 'function'>
+print(type(e.instance_method))         # <class 'method'> (bound)
+print(type(Example.class_method))      # <class 'method'> (bound to class)
+print(type(e.class_method))            # <class 'method'> (bound to class)
+print(type(Example.static_method))     # <class 'function'>
+print(type(e.static_method))           # <class 'function'>
+```
+
+### **2. Use `@classmethod` for Factory Methods and Class-Level Operations**
+```python
+class Timer:
+    _timezone = "UTC"  # Class attribute
+    
+    def __init__(self):
+        self._start = None
+    
+    @classmethod
+    def set_timezone(cls, zone):
+        """Set timezone for ALL Timer instances."""
+        cls._timezone = zone  # Modifies class, not instance
+    
+    @classmethod
+    def from_timestamp(cls, ts):
+        """Factory method - creates instance from timestamp."""
+        instance = cls()  # Creates new instance of this class
+        instance._start = ts
+        return instance
+```
+
+### **3. `@staticmethod` Use is Controversial**
+```python
+# ❌ Often unnecessary - can be module-level function
+class MathUtils:
+    @staticmethod
+    def add(a, b):
+        return a + b  # Could just be module function
+
+# ✅ Only use static methods when logically grouping with class
+class DateValidator:
+    @staticmethod
+    def is_valid_date(date_str):
+        """Validation specific to date formats."""
+        # Logically belongs with Date-related classes
+        pass
+```
+
+### **4. Don't Confuse `@classmethod` with Modifying Class State**
+```python
+class Counter:
+    count = 0  # Class attribute
+    
+    @classmethod
+    def increment(cls):
+        cls.count += 1  # ✅ Modifies class attribute
+    
+    def instance_increment(self):
+        self.count += 1  # ❌ Creates instance attribute!
+        # Should be: type(self).count += 1
+```
+
+### **5. Class Methods Inherit Properly**
+```python
+class Base:
+    @classmethod
+    def factory(cls):
+        return cls()  # Creates instance of calling class
+
+class Derived(Base):
+    pass
+
+Base.factory()   # Returns Base instance
+Derived.factory()  # Returns Derived instance (not Base!)
+```
+
+### **6. Static Methods Don't Have Access to Class/Instance**
+```python
+class Database:
+    connection_string = "localhost"
+    
+    @staticmethod
+    def connect():
+        # ❌ CANNOT access class attribute directly
+        # return connect(Database.connection_string)  # Hardcoded class name
+        
+        # ✅ Better as class method
+        pass
+    
+    @classmethod
+    def connect_class(cls):
+        return connect(cls.connection_string)  # Can access class attributes
+```
+
+### **7. Watch for Method Shadowing in Inheritance**
+```python
+class Parent:
+    @classmethod
+    def create(cls):
+        return f"Parent from {cls}"
+    
+    @staticmethod
+    def utility():
+        return "Parent utility"
+
+class Child(Parent):
+    @classmethod
+    def create(cls):  # Overrides parent class method
+        return f"Child from {cls}"
+    
+    @staticmethod
+    def utility():  # Hides parent static method
+        return "Child utility"
+```
+
+---
+
+## **Best Practices**
+
+### **1. Use Class Methods for Alternative Constructors**
+```python
+class Person:
+    def __init__(self, name, age):
+        self.name = name
+        self.age = age
+    
+    @classmethod
+    def from_birth_year(cls, name, birth_year):
+        """Create Person from birth year."""
+        age = datetime.now().year - birth_year
+        return cls(name, age)  # Calls __init__
+
+    @classmethod
+    def from_dict(cls, data):
+        """Create Person from dictionary."""
+        return cls(data['name'], data['age'])
+```
+
+### **2. Class Methods for Class-Level Configuration**
+```python
+class AppConfig:
+    _settings = {}
+    
+    @classmethod
+    def configure(cls, **kwargs):
+        cls._settings.update(kwargs)
+    
+    @classmethod
+    def get_setting(cls, key):
+        return cls._settings.get(key)
+    
+    def __init__(self):
+        # All instances share same _settings
+        self.config = self._settings
+```
+
+### **3. Static Methods Only When Truly Independent**
+```python
+class Geometry:
+    PI = 3.14159
+    
+    @staticmethod
+    def circle_area(radius):
+        """Pure function - no state needed."""
+        return Geometry.PI * radius ** 2  # Note: Uses class name
+    
+    # Could also be @classmethod for inheritance:
+    @classmethod
+    def circle_area_class(cls, radius):
+        return cls.PI * radius ** 2  # Uses cls for inheritance
+```
+
+### **4. Document Method Types Clearly**
+```python
+class DataProcessor:
+    @classmethod
+    def from_file(cls, filename):
+        """Class method: creates instance from file.
+        
+        Args:
+            filename: Path to data file
+        
+        Returns:
+            New DataProcessor instance with loaded data
+        """
+        data = cls._load_data(filename)
+        return cls(data)
+    
+    @staticmethod
+    def validate_format(data):
+        """Static method: validates data format.
+        
+        This method doesn't need instance or class state.
+        Consider moving to module level if used outside class.
+        """
+        return isinstance(data, dict)
+```
+
+### **5. Consider Performance (Minimal Difference)**
+```python
+# Performance hierarchy (fastest to slowest):
+# 1. Static methods (no binding overhead)
+# 2. Class methods (class binding)
+# 3. Instance methods (instance binding)
+# Usually negligible unless in tight loops
+```
+
+---
+
+## **Common Pitfalls**
+
+### **1. Using Static Methods When Class Methods Needed**
+```python
+class Logger:
+    log_level = "INFO"  # Class attribute
+    
+    @staticmethod
+    def set_level(level):
+        # ❌ Cannot modify class attribute
+        Logger.log_level = level  # Hardcoded class name
+    
+    @classmethod  # ✅ Should be class method
+    def set_level_class(cls, level):
+        cls.log_level = level  # Works with inheritance
+```
+
+### **2. Instance Methods Called Without Instance**
+```python
+class Calculator:
+    def add(self, a, b):
+        return a + b
+
+# ❌ Wrong way
+Calculator.add(2, 3)  # TypeError: missing self
+
+# ✅ Right ways
+calc = Calculator()
+calc.add(2, 3)  # Instance method
+Calculator.add(calc, 2, 3)  # Explicit instance
+```
+
+### **3. Forgetting `cls` Parameter in Class Methods**
+```python
+class Example:
+    @classmethod
+    def factory():  # ❌ Missing cls parameter
+        return Example()  # Hardcoded class name
+    
+    @classmethod
+    def factory_correct(cls):  # ✅ Has cls
+        return cls()  # Works with inheritance
+```
+
+### **4. Static Methods That Should Be Functions**
+```python
+# ❌ Unnecessary static method
+class StringUtils:
+    @staticmethod
+    def capitalize(text):
+        return text.capitalize()
+
+# ✅ Better as module function
+def capitalize_text(text):
+    return text.capitalize()
+
+# Only use static method if it logically belongs with class
+class HTMLParser:
+    @staticmethod
+    def escape_html(text):
+        """Specific to HTML parsing."""
+        return html.escape(text)
+```
+
+### **5. Mixing Method Types Incorrectly**
+```python
+class Database:
+    @classmethod
+    def connect(cls, config):
+        return cls(config)
+    
+    def query(self, sql):  # Instance method
+        return self.connection.execute(sql)
+    
+    @staticmethod
+    def format_sql(sql):  # Static - no state needed
+        return sql.strip().upper()
+
+# Correct usage:
+db = Database.connect(config)  # Class method
+result = db.query("SELECT * FROM users")  # Instance method
+formatted = Database.format_sql("select *")  # Static method
+```
+
+---
+
+## **Timer Class Example - Practical Application**
+
+### **Key Design Decisions**
+```python
+class Timer:
+    _timezone = "UTC"  # Class attribute (shared)
+    
+    # Class method - modifies shared class state
+    @classmethod
+    def set_timezone(cls, offset, name):
+        cls._timezone = timezone(offset, name)
+    
+    # Static method - independent utility
+    @staticmethod
+    def current_utc():
+        return datetime.utcnow()  # No class/instance state needed
+    
+    # Class method - uses class state
+    @classmethod
+    def current_local(cls):
+        return datetime.now(cls._timezone)  # Uses class timezone
+    
+    # Instance methods - instance-specific state
+    def start(self):
+        self._start = self.current_utc()  # Uses static method
+    
+    @property  # Instance property
+    def elapsed(self):
+        if not self._start:
+            raise TimerError("Not started")
+        return (self.current_utc() - self._start).total_seconds()
+```
+
+### **Method Type Selection Guide**
+
+| Use Case | Method Type | Why |
+|----------|------------|-----|
+| **Factory methods** | `@classmethod` | Returns instance of calling class |
+| **Class configuration** | `@classmethod` | Modifies class-level state |
+| **Pure utilities** | `@staticmethod` or module function | No state needed |
+| **Instance state access** | Instance method | Needs `self` |
+| **Alternative constructors** | `@classmethod` | Creates instances differently |
+| **Class constants access** | `@classmethod` | Uses class attributes |
+
+---
+
+## **Key Takeaways**
+
+1. **Instance methods** (default) bind to instances, receive `self`
+2. **Class methods** (`@classmethod`) always bind to class, receive `cls`
+3. **Static methods** (`@staticmethod`) never bind, receive no automatic arguments
+4. **Use `@classmethod`** for factory methods, class configuration, alternative constructors
+5. **Use `@staticmethod` sparingly** - often better as module functions
+6. **Static methods are controversial** - many Pythonistas avoid them
+7. **Class methods work with inheritance** - `cls` refers to calling class
+8. **Method binding affects performance** slightly (static fastest, instance slowest)
+9. **Document method types** clearly for API users
+10. **Choose method type based on needed state access**: instance, class, or none
+
+**Choose method types based on what data the method needs: instance state (`self`), class state (`cls`), or no state at all (static/module function).**
+
+
+
+
+
