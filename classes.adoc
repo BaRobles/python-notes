@@ -4221,3 +4221,62 @@ class Timer:
 .Rule:
 Choose method types based on what data the method needs:
 instance state (self), class state (cls), or no state at all (static/module function).
+
+----
+
+= 34 - CLASS BODY SCOPE
+
+* A class body has its own scope where class attributes are defined and can reference each other directly.
+* However, functions defined inside a class (methods) have their scope nested in the class's *containing scope* (e.g., module or outer function), *not* in the class body scope.
+* To access class attributes from within methods, explicit qualification is required:
+  ** `self.attribute` for instance methods
+  ** `cls.attribute` for class methods
+  ** `ClassName.attribute` for static methods
+* If a method references an unqualified name, Python searches the method's enclosing scope, which is *outside* the class body. This can lead to unexpected behavior if a variable with the same name exists in an outer scope.
+* Comprehensions (list, dict, set, generator) inside class bodies also behave like functions—their scope is the class's containing scope, not the class body scope.
+* When a class is defined inside a function, its methods become *closures* over the function's local variables, not over the class's own attributes.
+* This design means class attributes and methods do not share the same lexical scope, requiring explicit name resolution via `self`, `cls`, or `ClassName`.
+
+== Key Examples
+
+=== Direct Attribute References Work in Class Body
+[source,python]
+----
+class Language:
+    major = 3
+    minor = 7
+    full = f"{major}.{minor}"  # Works: same scope
+----
+
+=== Methods Require Explicit Access
+[source,python]
+----
+class Language:
+    major = 3
+    def version(self):
+        return f"{self.major}.{self.minor}"  # Must use self.
+----
+
+=== Comprehensions Reference Outer Scope
+[source,python]
+----
+name = "Guido"  # Global variable
+
+class MyClass:
+    name = "Raymond"  # Class attribute
+    list_one = [name] * 3           # Uses class attribute: ["Raymond", ...]
+    list_two = [name for _ in range(3)]  # Uses global "Guido"! (comprehension is a function)
+----
+
+=== Nested Class Example (Closure)
+[source,python]
+----
+def gen_class():
+    major, minor = 0, 40  # Outer function variables
+    class Language:
+        major, minor = 3, 7  # Class attributes
+        @classmethod
+        def version(cls):
+            return f"{major}.{minor}"  # Uses function variables (closure), NOT class attributes!
+    return Language
+----
