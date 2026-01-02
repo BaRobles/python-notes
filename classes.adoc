@@ -4236,9 +4236,9 @@ instance state (self), class state (cls), or no state at all (static/module func
 * When a class is defined inside a function, its methods become *closures* over the function's local variables, not over the class's own attributes.
 * This design means class attributes and methods do not share the same lexical scope, requiring explicit name resolution via `self`, `cls`, or `ClassName`.
 
-== Key Examples
+=== Key Examples
 
-=== Direct Attribute References Work in Class Body
+==== Direct Attribute References Work in Class Body
 [source,python]
 ----
 class Language:
@@ -4247,7 +4247,7 @@ class Language:
     full = f"{major}.{minor}"  # Works: same scope
 ----
 
-=== Methods Require Explicit Access
+==== Methods Require Explicit Access
 [source,python]
 ----
 class Language:
@@ -4256,7 +4256,7 @@ class Language:
         return f"{self.major}.{self.minor}"  # Must use self.
 ----
 
-=== Comprehensions Reference Outer Scope
+==== Comprehensions Reference Outer Scope
 [source,python]
 ----
 name = "Guido"  # Global variable
@@ -4267,7 +4267,7 @@ class MyClass:
     list_two = [name for _ in range(3)]  # Uses global "Guido"! (comprehension is a function)
 ----
 
-=== Nested Class Example (Closure)
+==== Nested Class Example (Closure)
 [source,python]
 ----
 def gen_class():
