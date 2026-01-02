@@ -4222,9 +4222,8 @@ class Timer:
 Choose method types based on what data the method needs:
 instance state (self), class state (cls), or no state at all (static/module function).
 
-----
 
-= 34 - CLASS BODY SCOPE
+== 34 - CLASS BODY SCOPE
 
 * A class body has its own scope where class attributes are defined and can reference each other directly.
 * However, functions defined inside a class (methods) have their scope nested in the class's *containing scope* (e.g., module or outer function), *not* in the class body scope.
